@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MASTERCLASS · Drive to Learn</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0f;
+    overflow: hidden;
+    font-family: 'Space Mono', monospace;
+    cursor: none;
+  }
+
+  #canvas { display: block; }
+
+  /* Custom cursor */
+  #cursor {
+    position: fixed;
+    width: 16px; height: 16px;
+    border: 2px solid #ff4d00;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: transform 0.1s, background 0.2s;
+    mix-blend-mode: difference;
+  }
+
+  /* Intro screen */
+  #intro {
+    position: fixed; inset: 0;
+    background: #0a0a0f;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100;
+    transition: opacity 0.8s ease;
+  }
+  #intro.hidden { opacity: 0; pointer-events: none; }
+
+  .intro-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(60px, 12vw, 140px);
+    color: #fff;
+    letter-spacing: 0.05em;
+    line-height: 0.9;
+    text-align: center;
+  }
+  .intro-title span { color: #ff4d00; }
+
+  .intro-sub {
+    margin-top: 20px;
+    font-size: 11px;
+    color: #666;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+  }
+
+  .intro-controls {
+    margin-top: 50px;
+    display: grid;
+    grid-template-columns: repeat(3, 60px);
+    grid-template-rows: repeat(2, 60px);
+    gap: 6px;
+  }
+
+  .key {
+    background: #1a1a2e;
+    border: 1px solid #333;
+    border-bottom: 3px solid #444;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    color: #888;
+    transition: all 0.1s;
+  }
+  .key.wide { grid-column: span 3; font-size: 12px; letter-spacing: 0.2em; color: #ff4d00; }
+  .key.active { background: #ff4d00; color: white; border-color: #ff4d00; transform: translateY(2px); }
+
+  .start-btn {
+    margin-top: 50px;
+    padding: 16px 60px;
+    background: transparent;
+    border: 2px solid #ff4d00;
+    color: #ff4d00;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .start-btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: #ff4d00;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s;
+    z-index: -1;
+  }
+  .start-btn:hover { color: #0a0a0f; }
+  .start-btn:hover::before { transform: scaleX(1); }
+
+  /* HUD */
+  #hud {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  #hud.visible { opacity: 1; }
+
+  .hud-corner {
+    position: absolute;
+    padding: 20px 24px;
+  }
+  .hud-tl { top: 0; left: 0; }
+  .hud-tr { top: 0; right: 0; text-align: right; }
+  .hud-bl { bottom: 0; left: 0; }
+
+  .hud-label {
+    font-size: 9px;
+    color: #ff4d00;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .hud-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px;
+    color: #fff;
+    letter-spacing: 0.1em;
+  }
+
+  /* Speedometer arc */
+  #speedometer {
+    position: absolute;
+    bottom: 20px; right: 30px;
+    width: 120px; height: 120px;
+  }
+
+  /* Popup card */
+  #popup {
+    position: fixed;
+    bottom: 40px; left: 50%;
+    transform: translateX(-50%) translateY(120px);
+    background: rgba(10, 10, 15, 0.95);
+    border: 1px solid #ff4d00;
+    border-radius: 2px;
+    padding: 20px 28px;
+    min-width: 280px;
+    max-width: 360px;
+    z-index: 60;
+    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    backdrop-filter: blur(20px);
+  }
+  #popup.visible { transform: translateX(-50%) translateY(0); }
+
+  .popup-tag {
+    font-size: 9px;
+    color: #ff4d00;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .popup-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    color: #fff;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+  }
+  .popup-desc {
+    font-size: 11px;
+    color: #888;
+    line-height: 1.7;
+  }
+
+  /* Mini map */
+  #minimap {
+    position: fixed;
+    top: 20px; right: 20px;
+    width: 120px; height: 120px;
+    background: rgba(10,10,15,0.8);
+    border: 1px solid #222;
+    border-radius: 2px;
+    overflow: hidden;
+    z-index: 60;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  #minimap.visible { opacity: 1; }
+  #minimap canvas { width: 100%; height: 100%; }
+
+  /* Corner decorations */
+  .corner-decoration {
+    position: absolute;
+    width: 40px; height: 40px;
+  }
+  .corner-decoration svg { width: 100%; height: 100%; }
+  .corner-tl { top: 16px; left: 16px; }
+  .corner-tr { top: 16px; right: 16px; transform: scaleX(-1); }
+  .corner-bl { bottom: 16px; left: 16px; transform: scaleY(-1); }
+  .corner-br { bottom: 16px; right: 16px; transform: scale(-1); }
+
+  /* Loading bar */
+  #loading {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: #1a1a1a;
+    z-index: 200;
+    transition: opacity 0.5s;
+  }
+  #loading-bar {
+    height: 100%;
+    background: #ff4d00;
+    width: 0%;
+    transition: width 0.3s;
+    box-shadow: 0 0 10px #ff4d00;
+  }
+
+  /* Scanlines overlay */
+  #scanlines {
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* Lesson counter */
+  .lesson-counter {
+    display: flex; gap: 8px; margin-top: 8px;
+  }
+  .lesson-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #222;
+    border: 1px solid #444;
+    transition: all 0.3s;
+  }
+  .lesson-dot.collected { background: #ff4d00; border-color: #ff4d00; box-shadow: 0 0 8px #ff4d00; }
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="scanlines"></div>
+<div id="loading"><div id="loading-bar"></div></div>
+
+<!-- Intro -->
+<div id="intro">
+  <div class="intro-title">MASTER<span>CLASS</span></div>
+  <div class="intro-sub">Drive through knowledge · Collect lessons</div>
+  <div class="intro-controls">
+    <div class="key" id="k-up">↑</div>
+    <div class="key" id="k-up2" style="grid-column:2">W</div>
+    <div class="key" style="grid-column:3"></div>
+    <div class="key" id="k-left">←</div>
+    <div class="key" id="k-down">↓</div>
+    <div class="key" id="k-right">→</div>
+  </div>
+  <button class="start-btn" id="startBtn">PRESS TO DRIVE</button>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-corner hud-tl">
+    <div class="hud-label">Lessons</div>
+    <div class="hud-value" id="score">0 / 6</div>
+    <div class="lesson-counter" id="lessonDots"></div>
+  </div>
+  <div class="hud-corner hud-bl">
+    <div class="hud-label">Speed</div>
+    <div class="hud-value" id="speedVal">0</div>
+  </div>
+</div>
+
+<!-- Minimap -->
+<div id="minimap"><canvas id="minimapCanvas"></canvas></div>
+
+<!-- Popup -->
+<div id="popup">
+  <div class="popup-tag" id="popup-tag">LESSON 01</div>
+  <div class="popup-title" id="popup-title">Welcome</div>
+  <div class="popup-desc" id="popup-desc">Drive into glowing orbs to collect lessons.</div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ─── SETUP ────────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.9;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0f);
+scene.fog = new THREE.Fog(0x0a0a0f, 30, 80);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(0, 8, 12);
+
+// ─── CURSOR ───────────────────────────────────────────────────────────────────
+const cursorEl = document.getElementById('cursor');
+document.addEventListener('mousemove', e => {
+  cursorEl.style.left = e.clientX + 'px';
+  cursorEl.style.top = e.clientY + 'px';
+});
+
+// ─── LIGHTS ───────────────────────────────────────────────────────────────────
+const ambient = new THREE.AmbientLight(0x1a1a2e, 3);
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight(0xfff0e0, 2);
+sun.position.set(20, 40, 20);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far = 120;
+sun.shadow.camera.left = -50;
+sun.shadow.camera.right = 50;
+sun.shadow.camera.top = 50;
+sun.shadow.camera.bottom = -50;
+scene.add(sun);
+
+const fillLight = new THREE.DirectionalLight(0x4060ff, 0.5);
+fillLight.position.set(-20, 10, -10);
+scene.add(fillLight);
+
+// ─── GROUND ───────────────────────────────────────────────────────────────────
+function makeGround() {
+  const geo = new THREE.PlaneGeometry(100, 100, 40, 40);
+  // Slight height variation
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    const d = Math.sqrt(x*x + z*z);
+    if (d > 5) pos.setY(i, (Math.random() - 0.5) * 0.4);
+  }
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({ color: 0x0d1117, roughness: 0.9, metalness: 0.0 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+
+  // Grid lines
+  const gridHelper = new THREE.GridHelper(100, 50, 0x1a1a2e, 0x111118);
+  gridHelper.position.y = 0.01;
+  scene.add(gridHelper);
+}
+makeGround();
+
+// ─── TRACK / ROAD ─────────────────────────────────────────────────────────────
+function makeRoad() {
+  const points = [
+    new THREE.Vector3(-15, 0.02, 0),
+    new THREE.Vector3(-10, 0.02, -15),
+    new THREE.Vector3(0, 0.02, -20),
+    new THREE.Vector3(10, 0.02, -15),
+    new THREE.Vector3(18, 0.02, 0),
+    new THREE.Vector3(10, 0.02, 15),
+    new THREE.Vector3(0, 0.02, 20),
+    new THREE.Vector3(-10, 0.02, 15),
+    new THREE.Vector3(-15, 0.02, 0),
+  ];
+  const curve = new THREE.CatmullRomCurve3(points, true);
+  const tubeGeo = new THREE.TubeGeometry(curve, 100, 2.2, 8, true);
+  const tubeMat = new THREE.MeshStandardMaterial({ color: 0x141420, roughness: 0.95, metalness: 0.1 });
+  const road = new THREE.Mesh(tubeGeo, tubeMat);
+  road.receiveShadow = true;
+  scene.add(road);
+}
+makeRoad();
+
+// ─── BUILDINGS / OBSTACLES ────────────────────────────────────────────────────
+const buildingPositions = [
+  [-5,0,-5],[5,0,-5],[-5,0,5],[5,0,5],
+  [-12,0,-8],[12,0,-8],[-12,0,8],[12,0,8],
+  [0,0,-10],[0,0,10],[-8,0,0],[8,0,0],
+  [-3,0,-14],[3,0,14],[-14,0,3],[14,0,-3],
+];
+
+const buildings = [];
+buildingPositions.forEach(([x,,z]) => {
+  const h = 1.5 + Math.random() * 4;
+  const w = 1 + Math.random() * 1.5;
+  const geo = new THREE.BoxGeometry(w, h, w);
+  const hue = Math.random() > 0.5 ? 0x1a1a2e : 0x0f0f1a;
+  const mat = new THREE.MeshStandardMaterial({ color: hue, roughness: 0.7, metalness: 0.3 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, h/2, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  buildings.push({ mesh, x, z, hw: w/2 + 0.5 });
+
+  // Neon edge glow on some buildings
+  if (Math.random() > 0.5) {
+    const edgeGeo = new THREE.EdgesGeometry(geo);
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0xff4d00, transparent: true, opacity: 0.3 });
+    const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+    mesh.add(edges);
+  }
+});
+
+// ─── LESSON ORBS ──────────────────────────────────────────────────────────────
+const lessons = [
+  { pos: [-12, 1.2, 0],   tag: 'LESSON 01', title: 'Three.js Basics',   desc: 'Scene, Camera, Renderer — the holy trinity of 3D on the web.' },
+  { pos: [0, 1.2, -18],   tag: 'LESSON 02', title: 'Geometry & Math',   desc: 'Vertices, normals, UV maps. Everything is triangles under the hood.' },
+  { pos: [16, 1.2, 0],    tag: 'LESSON 03', title: 'Shaders & GLSL',    desc: 'Write code that runs on the GPU. Vertex shaders move, fragment shaders color.' },
+  { pos: [0, 1.2, 18],    tag: 'LESSON 04', title: 'Physics & Motion',  desc: 'Collision detection, velocity, constraints. Make your world feel real.' },
+  { pos: [-8, 1.2, -12],  tag: 'LESSON 05', title: 'Post-Processing',   desc: 'Bloom, depth of field, chromatic aberration. Polish is everything.' },
+  { pos: [8, 1.2, 12],    tag: 'LESSON 06', title: 'Ship It',           desc: 'Performance, mobile, deployment. Build for the real world.' },
+];
+
+const orbMeshes = [];
+const orbLights = [];
+lessons.forEach((lesson, i) => {
+  const geo = new THREE.IcosahedronGeometry(0.7, 2);
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xff4d00,
+    emissive: 0xff2200,
+    emissiveIntensity: 0.8,
+    roughness: 0.2,
+    metalness: 0.8,
+    wireframe: false,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(...lesson.pos);
+  mesh.castShadow = false;
+  scene.add(mesh);
+
+  // Orbit ring
+  const ringGeo = new THREE.TorusGeometry(1.1, 0.04, 8, 40);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xff4d00, transparent: true, opacity: 0.4 });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.position.set(...lesson.pos);
+  ring.rotation.x = Math.PI / 2;
+  scene.add(ring);
+
+  // Point light
+  const light = new THREE.PointLight(0xff4d00, 2, 8);
+  light.position.set(...lesson.pos);
+  scene.add(light);
+
+  orbMeshes.push({ mesh, ring, lesson, collected: false, light });
+  orbLights.push(light);
+});
+
+// Dots UI
+const dotsContainer = document.getElementById('lessonDots');
+const dots = lessons.map((_, i) => {
+  const d = document.createElement('div');
+  d.className = 'lesson-dot';
+  dotsContainer.appendChild(d);
+  return d;
+});
+
+// ─── CAR ──────────────────────────────────────────────────────────────────────
+function buildCar() {
+  const car = new THREE.Group();
+
+  // Body
+  const bodyGeo = new THREE.BoxGeometry(1.8, 0.55, 3.6);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff4d00, roughness: 0.3, metalness: 0.7 });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 0.45;
+  body.castShadow = true;
+  car.add(body);
+
+  // Cabin
+  const cabinGeo = new THREE.BoxGeometry(1.4, 0.5, 2);
+  const cabinMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.2, metalness: 0.8, transparent: true, opacity: 0.9 });
+  const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+  cabin.position.set(0, 0.95, -0.1);
+  cabin.castShadow = true;
+  car.add(cabin);
+
+  // Windshield glow
+  const wsGeo = new THREE.PlaneGeometry(1.3, 0.45);
+  const wsMat = new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+  const ws = new THREE.Mesh(wsGeo, wsMat);
+  ws.position.set(0, 0.95, 0.92);
+  ws.rotation.x = Math.PI * 0.05;
+  car.add(ws);
+
+  // Wheels
+  const wheelGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.28, 16);
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8, metalness: 0.3 });
+  const wheelPositions = [[-1.05,0.36,1.2],[1.05,0.36,1.2],[-1.05,0.36,-1.2],[1.05,0.36,-1.2]];
+  const wheels = [];
+  wheelPositions.forEach(pos => {
+    const w = new THREE.Mesh(wheelGeo, wheelMat);
+    w.rotation.z = Math.PI / 2;
+    w.position.set(...pos);
+    w.castShadow = true;
+    car.add(w);
+    wheels.push(w);
+
+    // Hub
+    const hubGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.3, 8);
+    const hubMat = new THREE.MeshStandardMaterial({ color: 0xff4d00, roughness: 0.3, metalness: 0.9 });
+    const hub = new THREE.Mesh(hubGeo, hubMat);
+    hub.rotation.z = Math.PI / 2;
+    hub.position.set(...pos);
+    car.add(hub);
+  });
+
+  // Headlights
+  [[-0.65, 0.45, 1.81],[0.65, 0.45, 1.81]].forEach(pos => {
+    const hGeo = new THREE.SphereGeometry(0.12, 8, 8);
+    const hMat = new THREE.MeshBasicMaterial({ color: 0xffffee });
+    const h = new THREE.Mesh(hGeo, hMat);
+    h.position.set(...pos);
+    car.add(h);
+    const hl = new THREE.PointLight(0xffffee, 1.5, 10);
+    hl.position.set(...pos);
+    car.add(hl);
+  });
+
+  // Taillights
+  [[-0.65, 0.45, -1.81],[0.65, 0.45, -1.81]].forEach(pos => {
+    const tGeo = new THREE.SphereGeometry(0.1, 8, 8);
+    const tMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const t = new THREE.Mesh(tGeo, tMat);
+    t.position.set(...pos);
+    car.add(t);
+  });
+
+  car.position.set(0, 0, 0);
+  scene.add(car);
+  return { car, wheels };
+}
+
+const { car, wheels } = buildCar();
+
+// ─── PARTICLES ────────────────────────────────────────────────────────────────
+const particleGeo = new THREE.BufferGeometry();
+const particleCount = 600;
+const pPositions = new Float32Array(particleCount * 3);
+for (let i = 0; i < particleCount; i++) {
+  pPositions[i*3] = (Math.random() - 0.5) * 100;
+  pPositions[i*3+1] = Math.random() * 30;
+  pPositions[i*3+2] = (Math.random() - 0.5) * 100;
+}
+particleGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+const particleMat = new THREE.PointsMaterial({ color: 0x334466, size: 0.15, transparent: true, opacity: 0.6 });
+const particles = new THREE.Points(particleGeo, particleMat);
+scene.add(particles);
+
+// ─── INPUT ────────────────────────────────────────────────────────────────────
+const keys = {};
+document.addEventListener('keydown', e => { keys[e.code] = true; });
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// ─── PHYSICS STATE ────────────────────────────────────────────────────────────
+let carSpeed = 0;
+let carAngle = 0;
+const MAX_SPEED = 0.28;
+const ACCELERATION = 0.012;
+const FRICTION = 0.94;
+const TURN_SPEED = 0.045;
+
+// ─── MINIMAP ──────────────────────────────────────────────────────────────────
+const mmCanvas = document.getElementById('minimapCanvas');
+const mmCtx = mmCanvas.getContext('2d');
+mmCanvas.width = 120; mmCanvas.height = 120;
+
+function drawMinimap() {
+  mmCtx.fillStyle = '#0a0a0f';
+  mmCtx.fillRect(0, 0, 120, 120);
+
+  const scale = 2.5;
+  const cx = 60, cy = 60;
+
+  // Road hint (circle)
+  mmCtx.beginPath();
+  mmCtx.arc(cx, cy, 36, 0, Math.PI * 2);
+  mmCtx.strokeStyle = '#1a1a2e';
+  mmCtx.lineWidth = 10;
+  mmCtx.stroke();
+
+  // Buildings
+  buildings.forEach(b => {
+    const bx = cx + b.x * scale / 2;
+    const by = cy + b.z * scale / 2;
+    mmCtx.fillStyle = '#1a1a2e';
+    mmCtx.fillRect(bx - 2, by - 2, 4, 4);
+  });
+
+  // Orbs
+  orbMeshes.forEach(o => {
+    if (o.collected) return;
+    const ox = cx + o.mesh.position.x * scale / 2;
+    const oy = cy + o.mesh.position.z * scale / 2;
+    mmCtx.beginPath();
+    mmCtx.arc(ox, oy, 3, 0, Math.PI * 2);
+    mmCtx.fillStyle = '#ff4d00';
+    mmCtx.fill();
+  });
+
+  // Car
+  const carX = cx + car.position.x * scale / 2;
+  const carY = cy + car.position.z * scale / 2;
+  mmCtx.save();
+  mmCtx.translate(carX, carY);
+  mmCtx.rotate(carAngle);
+  mmCtx.fillStyle = '#ffffff';
+  mmCtx.fillRect(-3, -5, 6, 10);
+  mmCtx.restore();
+}
+
+// ─── POPUP ────────────────────────────────────────────────────────────────────
+const popupEl = document.getElementById('popup');
+const popupTag = document.getElementById('popup-tag');
+const popupTitle = document.getElementById('popup-title');
+const popupDesc = document.getElementById('popup-desc');
+let popupTimeout = null;
+
+function showPopup(lesson) {
+  popupTag.textContent = lesson.tag;
+  popupTitle.textContent = lesson.title;
+  popupDesc.textContent = lesson.desc;
+  popupEl.classList.add('visible');
+  clearTimeout(popupTimeout);
+  popupTimeout = setTimeout(() => popupEl.classList.remove('visible'), 4000);
+}
+
+// ─── COLLECT ──────────────────────────────────────────────────────────────────
+let collected = 0;
+
+function collectOrb(orb, i) {
+  if (orb.collected) return;
+  orb.collected = true;
+  collected++;
+
+  document.getElementById('score').textContent = `${collected} / ${lessons.length}`;
+  dots[i].classList.add('collected');
+  showPopup(orb.lesson);
+
+  // Burst effect
+  orb.mesh.visible = false;
+  orb.ring.visible = false;
+  orb.light.intensity = 0;
+
+  // Particle burst
+  burstParticles(orb.mesh.position.clone());
+
+  if (collected === lessons.length) {
+    setTimeout(() => {
+      showPopup({ tag: '🎉 COMPLETE', title: 'You Did It!', desc: 'All lessons collected. You are now a masterclass graduate.' });
+    }, 1000);
+  }
+}
+
+// Burst
+const burstPool = [];
+function burstParticles(pos) {
+  for (let i = 0; i < 20; i++) {
+    const geo = new THREE.SphereGeometry(0.08, 4, 4);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xff4d00 });
+    const p = new THREE.Mesh(geo, mat);
+    p.position.copy(pos);
+    p.userData.vel = new THREE.Vector3(
+      (Math.random()-0.5)*0.3,
+      Math.random()*0.4 + 0.1,
+      (Math.random()-0.5)*0.3
+    );
+    p.userData.life = 1;
+    scene.add(p);
+    burstPool.push(p);
+  }
+}
+
+function updateBursts() {
+  for (let i = burstPool.length - 1; i >= 0; i--) {
+    const p = burstPool[i];
+    p.userData.life -= 0.025;
+    p.position.add(p.userData.vel);
+    p.userData.vel.y -= 0.015;
+    p.material.opacity = p.userData.life;
+    p.material.transparent = true;
+    p.scale.setScalar(p.userData.life);
+    if (p.userData.life <= 0) {
+      scene.remove(p);
+      burstPool.splice(i, 1);
+    }
+  }
+}
+
+// ─── COLLISION (buildings) ─────────────────────────────────────────────────────
+function checkBuildingCollision(newX, newZ) {
+  for (const b of buildings) {
+    const dx = Math.abs(newX - b.x);
+    const dz = Math.abs(newZ - b.z);
+    if (dx < b.hw && dz < b.hw) return true;
+  }
+  return false;
+}
+
+// ─── GAME STATE ───────────────────────────────────────────────────────────────
+let gameStarted = false;
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  document.getElementById('intro').classList.add('hidden');
+  document.getElementById('hud').classList.add('visible');
+  document.getElementById('minimap').classList.add('visible');
+  setTimeout(() => document.getElementById('loading').style.opacity = '0', 1000);
+  gameStarted = true;
+});
+
+// Fake loading bar
+let loadProgress = 0;
+const loadInterval = setInterval(() => {
+  loadProgress += Math.random() * 15;
+  if (loadProgress >= 100) { loadProgress = 100; clearInterval(loadInterval); }
+  document.getElementById('loading-bar').style.width = loadProgress + '%';
+}, 80);
+
+// ─── CAMERA FOLLOW ────────────────────────────────────────────────────────────
+const camOffset = new THREE.Vector3(0, 7, 12);
+const camTarget = new THREE.Vector3();
+
+// ─── MAIN LOOP ────────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+let time = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+  time += delta;
+
+  if (gameStarted) {
+    // ── Input ──
+    const forward = (keys['ArrowUp'] || keys['KeyW']);
+    const backward = (keys['ArrowDown'] || keys['KeyS']);
+    const left = (keys['ArrowLeft'] || keys['KeyA']);
+    const right = (keys['ArrowRight'] || keys['KeyD']);
+
+    if (forward) carSpeed = Math.min(carSpeed + ACCELERATION, MAX_SPEED);
+    else if (backward) carSpeed = Math.max(carSpeed - ACCELERATION, -MAX_SPEED * 0.6);
+    else carSpeed *= FRICTION;
+
+    if (Math.abs(carSpeed) > 0.002) {
+      const turn = TURN_SPEED * (carSpeed / MAX_SPEED);
+      if (left) carAngle += turn;
+      if (right) carAngle -= turn;
+    }
+
+    // ── Move ──
+    const newX = car.position.x + Math.sin(carAngle) * carSpeed;
+    const newZ = car.position.z + Math.cos(carAngle) * carSpeed;
+
+    // Boundary & collision
+    const bounded = Math.abs(newX) < 45 && Math.abs(newZ) < 45;
+    const noCollision = !checkBuildingCollision(newX, newZ);
+
+    if (bounded && noCollision) {
+      car.position.x = newX;
+      car.position.z = newZ;
+    } else {
+      carSpeed *= -0.3; // bounce
+    }
+
+    car.rotation.y = carAngle;
+
+    // Wheel spin
+    wheels.forEach(w => { w.rotation.x += carSpeed * 4; });
+
+    // ── Camera ──
+    const idealPos = new THREE.Vector3(
+      car.position.x - Math.sin(carAngle) * 10 + 0,
+      car.position.y + 7,
+      car.position.z - Math.cos(carAngle) * 10
+    );
+    camera.position.lerp(idealPos, 0.06);
+    camTarget.lerp(car.position, 0.1);
+    camera.lookAt(camTarget);
+
+    // ── Speed HUD ──
+    const spd = Math.abs(Math.round(carSpeed * 1000));
+    document.getElementById('speedVal').textContent = spd;
+
+    // ── Orbs ──
+    orbMeshes.forEach((orb, i) => {
+      if (orb.collected) return;
+      orb.mesh.rotation.y += 0.03;
+      orb.mesh.rotation.x += 0.01;
+      orb.mesh.position.y = orb.lesson.pos[1] + Math.sin(time * 2 + i) * 0.2;
+      orb.ring.rotation.z += 0.02;
+      orb.ring.position.y = orb.mesh.position.y;
+      orb.light.intensity = 1.5 + Math.sin(time * 3 + i) * 0.5;
+
+      // Collect check
+      const dx = car.position.x - orb.mesh.position.x;
+      const dz = car.position.z - orb.mesh.position.z;
+      if (Math.sqrt(dx*dx + dz*dz) < 2) collectOrb(orb, i);
+    });
+
+    // ── Minimap ──
+    drawMinimap();
+
+    // ── Bursts ──
+    updateBursts();
+  } else {
+    // Idle camera orbit
+    camera.position.x = Math.sin(time * 0.2) * 20;
+    camera.position.z = Math.cos(time * 0.2) * 20;
+    camera.position.y = 12;
+    camera.lookAt(0, 0, 0);
+  }
+
+  // Particles drift
+  particles.rotation.y += 0.0002;
+
+  renderer.render(scene, camera);
+}
+
+// ─── RESIZE ───────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+// ─── Key indicators in intro ──────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.code === 'ArrowUp' || e.code === 'KeyW') document.getElementById('k-up').classList.add('active'), document.getElementById('k-up2').classList.add('active');
+  if (e.code === 'ArrowDown' || e.code === 'KeyS') document.getElementById('k-down').classList.add('active');
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') document.getElementById('k-left').classList.add('active');
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') document.getElementById('k-right').classList.add('active');
+});
+document.addEventListener('keyup', e => {
+  if (e.code === 'ArrowUp' || e.code === 'KeyW') document.getElementById('k-up').classList.remove('active'), document.getElementById('k-up2').classList.remove('active');
+  if (e.code === 'ArrowDown' || e.code === 'KeyS') document.getElementById('k-down').classList.remove('active');
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') document.getElementById('k-left').classList.remove('active');
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') document.getElementById('k-right').classList.remove('active');
+});
+
+animate();
+</script>
+</body>
+</html>
